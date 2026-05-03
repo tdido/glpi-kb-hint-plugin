@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-05-04
+
+### Added
+- Client-side `STOPWORDS` set (English + Spanish defaults) consulted during tokenization. Drops common short words before the `*` prefix wildcard is appended, since MySQL FT skips stopword filtering on wildcard-prefix tokens. Without this, typing "paragraph for grant" would surface every article containing words starting with "for" (form, format, force, forward …).
+
 ## [0.1.0] - 2026-05-04
 
 ### Added
@@ -25,5 +30,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `make dist` target that produces a `kbhint-<version>.tar.bz2` ready to drop into another GLPI 11.x install.
 - Documentation: README with install, query model, configuration knobs, manual verification matrix, and notes on the legacy vs Symfony controller endpoint styles.
 
-[Unreleased]: https://github.com/tdido/glpi-kb-hint-plugin/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tdido/glpi-kb-hint-plugin/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/tdido/glpi-kb-hint-plugin/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/tdido/glpi-kb-hint-plugin/releases/tag/v0.1.0

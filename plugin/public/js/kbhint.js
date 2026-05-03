@@ -10,6 +10,24 @@
     // 'recall'    = OR across title + description tokens (wider net, all results ranked together).
     // 'precision' = title tokens required, description tokens only boost score.
     const MATCH_MODE = 'recall';
+    // Common short words that, once turned into prefix-wildcard tokens (for*, the*, para*),
+    // would match too broadly: MySQL FT does not apply its stopword filter to wildcard
+    // prefixes. The default mirrors InnoDB's built-in English stopword list plus common
+    // Spanish articles, prepositions, conjunctions, and pronouns. Admins can extend it with
+    // site-specific entries; entries must be lowercase. Tokens shorter than MIN_QUERY_LEN
+    // are dropped by the length check before this set is consulted, so the 2-char entries
+    // here are documentation + defence-in-depth if MIN_QUERY_LEN is ever lowered.
+    const STOPWORDS = new Set([
+        // English (InnoDB default)
+        'a', 'about', 'an', 'are', 'as', 'at', 'be', 'by', 'com', 'de', 'en', 'for', 'from',
+        'how', 'i', 'in', 'is', 'it', 'la', 'of', 'on', 'or', 'that', 'the', 'this', 'to',
+        'was', 'what', 'when', 'where', 'who', 'will', 'with', 'und', 'www',
+        // Spanish
+        'el', 'los', 'las', 'un', 'una', 'unos', 'unas', 'del', 'al', 'con', 'por', 'para',
+        'que', 'se', 'lo', 'le', 'les', 'me', 'te', 'nos', 'mi', 'tu', 'su', 'sus',
+        'es', 'son', 'fue', 'ser', 'esta', 'estan', 'como', 'pero', 'sino', 'cuando',
+        'donde', 'quien', 'cual', 'si', 'no', 'ya', 'muy', 'mas', 'y', 'e', 'u', 'o',
+    ]);
 
     if (!isFormRenderPage()) {
         return;
@@ -216,6 +234,9 @@
         const matches = text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) || [];
         for (const tok of matches) {
             if (tok.length < MIN_QUERY_LEN) {
+                continue;
+            }
+            if (STOPWORDS.has(tok)) {
                 continue;
             }
             if (seen.has(tok)) {

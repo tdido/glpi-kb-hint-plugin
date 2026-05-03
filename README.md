@@ -112,6 +112,7 @@ Constants near the top of `plugin/public/js/kbhint.js`:
 - `MAX_RESULTS = 5`.
 - `MAX_TOKENS = 8` (across title and description combined; keeps the URL bounded and avoids pathological queries on long descriptions).
 - `MATCH_MODE = 'recall' | 'precision'` (default `'recall'`; see the summary at the top of this README for the trade-off).
+- `STOPWORDS` — `Set` of lowercase tokens that are silently dropped before the wildcard is appended. Defaults to InnoDB's English stopword list plus common Spanish articles, prepositions, conjunctions, and pronouns. Without this, `for*` would match "format", "force", "forward", etc., because MySQL FT does not apply its stopword filter to prefix-wildcard tokens. Extend the set in-place for site-specific noise terms.
 
 A real config UI is out of scope for v1.
 

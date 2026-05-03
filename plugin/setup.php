@@ -1,6 +1,6 @@
 <?php
 
-define('PLUGIN_KBHINT_VERSION', '0.1.0');
+define('PLUGIN_KBHINT_VERSION', '0.1.1');
 define('PLUGIN_KBHINT_MIN_GLPI', '11.0.0');
 define('PLUGIN_KBHINT_MAX_GLPI', '11.99.99');
 

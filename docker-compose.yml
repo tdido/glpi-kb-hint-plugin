@@ -1,0 +1,35 @@
+name: glpi-kbhint
+
+services:
+  glpi:
+    image: "glpi/glpi:11.0.7"
+    restart: "unless-stopped"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    ports:
+      - "${GLPI_HTTP_PORT:-8080}:80"
+    volumes:
+      - glpi_data:/var/glpi
+      - ./plugin:/var/www/glpi/plugins/kbhint:rw
+
+  db:
+    image: "mariadb:11"
+    restart: "unless-stopped"
+    environment:
+      MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+      MARIADB_DATABASE: ${GLPI_DB_NAME}
+      MARIADB_USER: ${GLPI_DB_USER}
+      MARIADB_PASSWORD: ${GLPI_DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u $$MARIADB_USER -p$$MARIADB_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  glpi_data:
+  db_data:

@@ -29,8 +29,9 @@ nuke:
 dist: clean-dist
 	@mkdir -p $(DIST_DIR)
 	tar --transform 's,^plugin,$(PLUGIN_KEY),' \
+	    --transform 's,^LICENSE$$,$(PLUGIN_KEY)/LICENSE,' \
 	    --exclude='.DS_Store' --exclude='*.swp' --exclude='*.bak' \
-	    -cjf $(TARBALL) plugin
+	    -cjf $(TARBALL) plugin LICENSE
 	@echo "Built $(TARBALL)"
 	@tar -tjf $(TARBALL) | head -20
 

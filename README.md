@@ -200,4 +200,4 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-GPLv3+
+GPLv3+. See [LICENSE](LICENSE) for the full text.

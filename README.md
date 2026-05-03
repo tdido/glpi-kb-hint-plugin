@@ -126,21 +126,72 @@ A real config UI is out of scope for v1.
 
 ## Packaging for distribution
 
-`make dist` builds `dist/kbhint-<version>.tar.bz2` whose top-level entry is `kbhint/` (matching the plugin key). Drop the archive into another GLPI 11.x instance's `plugins/` directory and extract:
+`make dist` builds `dist/kbhint-<version>.tar.bz2` whose top-level entry is `kbhint/` (matching the plugin key). The version in the tarball name is read from `PLUGIN_KBHINT_VERSION` in `plugin/setup.php`.
+
+### Bare-metal install
+
+If you have shell access to `<glpi_root>` directly:
 
 ```sh
 cd <glpi_root>/plugins/
 tar -xjf kbhint-0.1.0.tar.bz2
-```
-
-Then activate via `Setup → Plugins` or:
-
-```sh
+chown -R <web-user>:<web-user> kbhint     # often www-data:www-data
 php <glpi_root>/bin/console plugin:install kbhint
 php <glpi_root>/bin/console plugin:activate kbhint
 ```
 
-The version in the tarball name is read from `PLUGIN_KBHINT_VERSION` in `plugin/setup.php`.
+Or activate via the UI: `Setup → Plugins → KB Hint → Install → Enable`.
+
+### Docker install
+
+Two real-world gotchas to handle before you extract:
+
+1. **Make sure `plugins/` is persisted.** Many GLPI Docker images don't bind-mount or volume-mount `/var/www/glpi/plugins/` by default; whatever you drop in there lives in the container's writable layer and gets wiped on the next image rebuild or container recreation. Verify with:
+
+   ```sh
+   docker inspect <glpi-container> --format '{{range .Mounts}}{{.Type}} {{.Source}} -> {{.Destination}}{{println}}{{end}}'
+   ```
+
+   If `/var/www/glpi/plugins` is not in the list, add a bind mount (e.g. `/opt/glpi/plugins:/var/www/glpi/plugins`) to your compose file and recreate the container *before* installing the plugin. Inside the container the directory must end up owned by the webserver user (typically `www-data:www-data`, uid/gid 33 on Debian-based images).
+
+2. **`docker exec` may run as the webserver user, not root.** Several community and custom GLPI images set a default `USER www-data`. That changes which files you can clean up afterwards in `/tmp`. It's not a problem for the deploy itself; the leftover staged tarball inside the container is harmless and disappears on the next restart.
+
+Recipe that works regardless of how `plugins/` is mounted:
+
+```sh
+# 1. Stage the tarball on the Docker host.
+scp dist/kbhint-0.1.0.tar.bz2 <host>:/tmp/
+
+# 2. Copy into the container and extract into the plugin directory.
+ssh <host> 'docker cp /tmp/kbhint-0.1.0.tar.bz2 <glpi-container>:/tmp/kbhint.tar.bz2'
+ssh <host> 'docker exec <glpi-container> sh -c "
+  cd /var/www/glpi/plugins &&
+  tar -xjf /tmp/kbhint.tar.bz2 &&
+  chown -R www-data:www-data kbhint
+"'
+
+# 3. Install + activate via the GLPI console.
+ssh <host> 'docker exec <glpi-container> php /var/www/glpi/bin/console plugin:install kbhint'
+ssh <host> 'docker exec <glpi-container> php /var/www/glpi/bin/console plugin:activate kbhint'
+
+# 4. Verify.
+ssh <host> 'docker exec <glpi-container> php /var/www/glpi/bin/console plugin:list | grep kbhint'
+```
+
+### Smoke-test after install
+
+Sanity-check the assets and AJAX endpoint are reachable inside the container:
+
+```sh
+docker exec <glpi-container> sh -c "
+  curl -sS -o /dev/null -w 'JS  %{http_code} %{content_type} %{size_download}B\n' http://localhost/plugins/kbhint/js/kbhint.js
+  curl -sS -o /dev/null -w 'CSS %{http_code} %{content_type} %{size_download}B\n' http://localhost/plugins/kbhint/css/kbhint.css
+"
+```
+
+Both should return 200. The `/plugins/kbhint/ajax/search.php?q=test` endpoint will redirect (302) for unauthenticated requests; that's expected, the JS handles it gracefully.
+
+Then in a browser, log in as a regular user, open any active end-user form (`Administration → Forms` for the public URL `/Form/Render/<id>`), and start typing in the title field. The amber-headed dropdown should appear within ~300 ms.
 
 ## Changelog
 

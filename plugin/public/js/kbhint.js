@@ -6,6 +6,10 @@
     const MIN_QUERY_LEN = 3;
     const DEBOUNCE_MS = 300;
     const MAX_RESULTS = 5;
+    const MAX_TOKENS = 8;
+    // 'recall'    = OR across title + description tokens (wider net, all results ranked together).
+    // 'precision' = title tokens required, description tokens only boost score.
+    const MATCH_MODE = 'recall';
 
     if (!isFormRenderPage()) {
         return;
@@ -184,58 +188,78 @@
     }
 
     function runQuery(state) {
-        const titleVal = state.titleInput ? state.titleInput.value.trim() : '';
-        const descVal = state.descriptionField ? state.descriptionField.getValue().trim() : '';
-        const onDescription = !!(state.descriptionField && state.anchorEl === state.descriptionField.anchor);
+        const titleVal = state.titleInput ? state.titleInput.value : '';
+        const descVal = state.descriptionField ? state.descriptionField.getValue() : '';
 
-        const primary = onDescription
-            ? { value: descVal, source: 'description' }
-            : { value: titleVal, source: 'title' };
-        const fallback = onDescription
-            ? { value: titleVal, source: 'title' }
-            : { value: descVal, source: 'description' };
+        const titleTokens = tokenize(titleVal);
+        const descTokens = tokenize(descVal, titleTokens);
+        const expression = buildBooleanExpression(titleTokens, descTokens);
 
-        if (primary.value.length >= MIN_QUERY_LEN) {
-            state.lastSource = primary.source;
-            search(state, primary.value, primary.source).then((results) => {
-                if (results === null) {
-                    return;
-                }
-                if (results.length === 0 && fallback.value.length >= MIN_QUERY_LEN) {
-                    state.lastSource = fallback.source;
-                    search(state, fallback.value, fallback.source).then((fallbackResults) => {
-                        if (fallbackResults !== null) {
-                            render(state, fallbackResults);
-                        }
-                    });
-                } else {
-                    render(state, results);
-                }
-            });
+        if (!expression) {
+            render(state, []);
             return;
         }
 
-        if (fallback.value.length >= MIN_QUERY_LEN) {
-            state.lastSource = fallback.source;
-            search(state, fallback.value, fallback.source).then((results) => {
-                if (results !== null) {
-                    render(state, results);
-                }
-            });
-            return;
-        }
-
-        render(state, []);
+        search(state, expression).then((results) => {
+            if (results !== null) {
+                render(state, results);
+            }
+        });
     }
 
-    function search(state, value, source) {
+    function tokenize(text, alreadySeen) {
+        if (!text) {
+            return [];
+        }
+        const seen = new Set(alreadySeen || []);
+        const tokens = [];
+        const matches = text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) || [];
+        for (const tok of matches) {
+            if (tok.length < MIN_QUERY_LEN) {
+                continue;
+            }
+            if (seen.has(tok)) {
+                continue;
+            }
+            seen.add(tok);
+            tokens.push(tok);
+            if (tokens.length >= MAX_TOKENS) {
+                break;
+            }
+        }
+        return tokens;
+    }
+
+    function buildBooleanExpression(titleTokens, descTokens) {
+        if (MATCH_MODE === 'recall') {
+            const all = titleTokens.concat(descTokens);
+            if (all.length === 0) {
+                return '';
+            }
+            return all.map((t) => t + '*').join(' ');
+        }
+        const required = titleTokens.length > 0 ? titleTokens : descTokens;
+        const boosters = titleTokens.length > 0 ? descTokens : [];
+        if (required.length === 0) {
+            return '';
+        }
+        const parts = [];
+        for (const t of required) {
+            parts.push('+' + t + '*');
+        }
+        for (const t of boosters) {
+            parts.push(t + '*');
+        }
+        return parts.join(' ');
+    }
+
+    function search(state, value) {
         if (state.controller) {
             state.controller.abort();
         }
         state.controller = new AbortController();
         const params = new URLSearchParams();
         params.set('q', value);
-        params.set('source', source);
 
         const url = root + '/plugins/kbhint/ajax/search.php?' + params.toString();
         return fetch(url, {

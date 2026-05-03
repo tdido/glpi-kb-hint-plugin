@@ -1,6 +1,11 @@
 # glpi-kb-hint-plugin
 
-A GLPI 11.x plugin that surfaces Knowledge Base article suggestions inline as the user types in the new end-user **Form**. The currently focused field (Title or Description) drives the primary query; the other field is used as a fallback when the primary returns zero hits. Clicking a suggestion opens the article in a new tab.
+A GLPI 11.x plugin that surfaces Knowledge Base article suggestions inline as the user types in the new end-user **Form**. Title and description text are combined into a single MySQL boolean-mode full-text query. The combination strategy is configurable (compile-time constant `MATCH_MODE` in `plugin/public/js/kbhint.js`):
+
+- **`recall`** (default) — every token from title and description becomes `token*` (OR with prefix wildcard). Wider net; all matching articles are returned and ranked together.
+- **`precision`** — title tokens become required (`+token*`), description tokens only boost the score. Articles that don't satisfy a title term are excluded even if the description matches. If the title is empty, description tokens become the required terms.
+
+Clicking a suggestion opens the article in a new tab.
 
 ## Layout
 
@@ -56,8 +61,9 @@ Browse `http://localhost:8080`:
 | --- | --- | --- |
 | Golden path | Open the form URL, type `vpn` in the title input. | Dropdown appears under the title with the VPN article. Clicking opens a new tab on `front/knowbaseitem.form.php?id=…`. |
 | Negative | Type `asdfgh`. | No dropdown, no console errors. |
-| Description-driven query | Focus the description editor and type a phrase (e.g. `tunnel`) that appears in the article body. | Dropdown anchors under the description section and shows the VPN article. |
-| Cross-field fallback | Type `vpn` in the title (matches the VPN article), focus the description, and type a phrase that has no match (e.g. `xyzzy`). | DevTools Network shows two requests: the description query returns 0, then a fallback title query returns the VPN article. The dropdown is shown anchored to the description. |
+| Description-only query (recall) | Leave the title empty; type a phrase that exists only in the article body (e.g. `tunnel`) into the description editor. | Dropdown anchors under the description section and shows the VPN article. The single query sent is `tunnel*`. |
+| Combined recall query | Type `vpn` in the title and `pass` in the description. | Dropdown shows both articles. The single query is `vpn* pass*` and the FT engine ranks results by combined relevance. |
+| Precision-mode required term | Switch `MATCH_MODE` to `'precision'`, hard-refresh, then type `xyzzy` (no match) in the title and `vpn` (matches an article body) in the description. | Dropdown stays empty. The query is `+xyzzy* vpn*`; the required title term excludes everything regardless of the booster. |
 | Anonymous | If the form's access control allows public access, open it in a private window. | The plugin AJAX endpoint replies normally if GLPI started a session; if it 302s back to login, the JS catches it and silently disables itself. The form still submits in either case. |
 | Keyboard a11y | With the dropdown visible, press `↓` / `↑` to move selection, `Enter` to follow the highlighted link, `Escape` to dismiss. | Selection moves; `Enter` opens a new tab; `Escape` hides the dropdown. |
 
@@ -71,9 +77,16 @@ This means: **the first short-text question in DOM order is what the plugin trea
 
 ## How the search works
 
-Front-end calls `GET /plugins/kbhint/ajax/search.php?q=<text>&source=title|description`. The endpoint runs `KnowbaseItem::getListRequest(['contains' => q, 'faq' => is_anonymous], 'search')` against the GLPI core, which performs a MySQL full-text `MATCH AGAINST` over `glpi_knowbaseitems(name, answer)` with the visibility / FAQ ACL filters applied. The `source` parameter is informational; the underlying search is the same either way.
+Front-end calls `GET /plugins/kbhint/ajax/search.php?q=<expression>`. The endpoint runs `KnowbaseItem::getListRequest(['contains' => q, 'faq' => is_anonymous], 'search')` against the GLPI core, which performs a MySQL full-text `MATCH AGAINST(... IN BOOLEAN MODE)` over `glpi_knowbaseitems(name, answer)` with the visibility / FAQ ACL filters applied.
 
-The state machine in `kbhint.js` picks which text drives the primary query based on the currently focused field: typing in the title queries with the title text, typing in the description queries with the description text. If the primary query returns zero results and the *other* field has at least 3 characters, a single fallback query is fired against that field's text. Latest-request-wins via `AbortController` prevents stale results from out-racing the current keystroke.
+`kbhint.js` builds the boolean expression on every keystroke (debounced 300 ms):
+
+1. Tokenize the title and description into word tokens (Unicode letters and digits, ≥ 3 chars, deduped, capped at 8 total).
+2. **In `recall` mode (default):** every token becomes `token*` and the whole list is joined with spaces, e.g. `vpn* tunnel* pass*`. MySQL boolean mode treats unprefixed tokens as optional, so this is effectively an OR with prefix wildcards; matching articles are ranked by relevance across all terms.
+3. **In `precision` mode:** title tokens become `+token*` (required), description tokens stay `token*` (score boost). If the title is empty, description tokens become the required terms.
+4. The combined string is sent as `q`. GLPI's `KnowbaseItem::computeBooleanFullTextSearch` preserves boolean operators when present, so the expression survives untouched into the SQL `MATCH AGAINST`.
+
+There is exactly one request per keystroke; latest-request-wins via `AbortController` prevents stale results from racing the current input.
 
 We deliberately avoid `/apirest.php` because the form-render page does not expose a `Session-Token`, so cookie auth via a plugin endpoint is the only practical path.
 
@@ -94,9 +107,11 @@ For one read-only endpoint the controller route is overkill (extra class, autolo
 
 Constants near the top of `plugin/public/js/kbhint.js`:
 
-- `MIN_QUERY_LEN = 3` (skip queries shorter than this after trim; also matches MySQL InnoDB FT minimum word length default).
+- `MIN_QUERY_LEN = 3` (per-token threshold; also matches MySQL InnoDB FT minimum word length default, so shorter tokens would not match anything anyway).
 - `DEBOUNCE_MS = 300`.
 - `MAX_RESULTS = 5`.
+- `MAX_TOKENS = 8` (across title and description combined; keeps the URL bounded and avoids pathological queries on long descriptions).
+- `MATCH_MODE = 'recall' | 'precision'` (default `'recall'`; see the summary at the top of this README for the trade-off).
 
 A real config UI is out of scope for v1.
 

@@ -22,9 +22,9 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--tblr-secondary, #6c757d);
-    background: var(--tblr-bg-surface-secondary, #f6f7f9);
-    border-bottom: 1px solid var(--tblr-border-color, #dadfe5);
+    color: var(--tblr-body-color, #1f2937);
+    background: var(--tblr-warning-lt, #fff3cd);
+    border-bottom: 1px solid var(--tblr-warning, #ffecb5);
 }
 
 .kbhint-list {

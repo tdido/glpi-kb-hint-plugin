@@ -124,6 +124,28 @@ A real config UI is out of scope for v1.
 - FAQ-only proxy for anonymous forms (today, GLPI's session check on the AJAX endpoint redirects unauthenticated users to login; the JS catches the non-OK response and disables itself silently).
 - Marketplace packaging.
 
+## Packaging for distribution
+
+`make dist` builds `dist/kbhint-<version>.tar.bz2` whose top-level entry is `kbhint/` (matching the plugin key). Drop the archive into another GLPI 11.x instance's `plugins/` directory and extract:
+
+```sh
+cd <glpi_root>/plugins/
+tar -xjf kbhint-0.1.0.tar.bz2
+```
+
+Then activate via `Setup → Plugins` or:
+
+```sh
+php <glpi_root>/bin/console plugin:install kbhint
+php <glpi_root>/bin/console plugin:activate kbhint
+```
+
+The version in the tarball name is read from `PLUGIN_KBHINT_VERSION` in `plugin/setup.php`.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 GPLv3+

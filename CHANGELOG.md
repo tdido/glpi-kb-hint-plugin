@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-05-05
+
+### Added
+- Dismissable dropdown: a close button in the header (and the Escape key) suppresses suggestions for the current query expression. Dismissal is sticky across input edits, so backspacing and retyping the same query keeps the panel hidden; typing a different query brings fresh suggestions back.
+
+### Changed
+- Dropdown panel now uses Tabler's `--tblr-bg-surface` token, which GLPI's palettes (`darker`, `dark`, etc.) actually override, so the panel renders correctly in dark color palettes.
+
+### Fixed
+- Race where dismissing the dropdown while a search request was in flight could let the panel re-appear once the late response resolved. Dismissal now aborts any pending request.
+
 ## [0.1.1] - 2026-05-04
 
 ### Added

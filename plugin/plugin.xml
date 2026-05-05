@@ -17,11 +17,11 @@
     <issues>https://github.com/tdido/glpi-kb-hint-plugin/issues</issues>
     <license>GPLv3+</license>
     <authors>
-        <author>tdido</author>
+        <author>Tomás Di Domenico</author>
     </authors>
     <versions>
         <version>
-            <num>0.1.1</num>
+            <num>0.1.2</num>
             <compatibility>~11.0</compatibility>
         </version>
     </versions>

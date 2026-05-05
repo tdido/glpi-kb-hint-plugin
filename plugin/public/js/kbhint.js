@@ -80,14 +80,28 @@
             items: [],
             selectedIndex: -1,
             lastSource: null,
+            lastExpression: '',
+            dismissedExpression: null,
         };
 
         state.dropdown = createDropdown();
         document.body.appendChild(state.dropdown.root);
 
+        state.dropdown.closeBtn.addEventListener('click', () => dismiss(state));
+
         bindInput(state);
         bindOutsideClick(state);
         bindReposition(state);
+    }
+
+    function dismiss(state) {
+        state.dismissedExpression = state.lastExpression || '';
+        if (state.controller) {
+            state.controller.abort();
+            state.controller = null;
+        }
+        state.dropdown.panel.hidden = true;
+        state.dropdown.live.textContent = '';
     }
 
     function discoverFields(formEl) {
@@ -214,7 +228,18 @@
         const expression = buildBooleanExpression(titleTokens, descTokens);
 
         if (!expression) {
+            state.lastExpression = '';
+            state.dismissedExpression = null;
             render(state, []);
+            return;
+        }
+
+        if (expression !== state.dismissedExpression) {
+            state.dismissedExpression = null;
+        }
+        state.lastExpression = expression;
+
+        if (expression === state.dismissedExpression) {
             return;
         }
 
@@ -318,7 +343,20 @@
 
         const header = document.createElement('div');
         header.className = 'kbhint-header';
-        header.textContent = 'Matching knowledge base articles';
+
+        const headerTitle = document.createElement('span');
+        headerTitle.className = 'kbhint-header-title';
+        headerTitle.textContent = 'Matching knowledge base articles';
+        header.appendChild(headerTitle);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'kbhint-close';
+        closeBtn.setAttribute('aria-label', 'Dismiss suggestions');
+        closeBtn.title = 'Dismiss';
+        closeBtn.textContent = '×';
+        header.appendChild(closeBtn);
+
         panel.appendChild(header);
 
         const ul = document.createElement('ul');
@@ -336,7 +374,7 @@
         root.appendChild(panel);
         root.appendChild(live);
 
-        return { root, panel, list: ul, live };
+        return { root, panel, list: ul, live, closeBtn };
     }
 
     function render(state, results) {
@@ -400,7 +438,7 @@
                 window.open(a.href, a.target || '_blank', 'noopener');
             }
         } else if (event.key === 'Escape') {
-            state.dropdown.panel.hidden = true;
+            dismiss(state);
         }
     }
 

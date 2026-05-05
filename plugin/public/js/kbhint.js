@@ -227,21 +227,17 @@
         const descTokens = tokenize(descVal, titleTokens);
         const expression = buildBooleanExpression(titleTokens, descTokens);
 
+        state.lastExpression = expression;
+
         if (!expression) {
-            state.lastExpression = '';
-            state.dismissedExpression = null;
             render(state, []);
             return;
         }
 
-        if (expression !== state.dismissedExpression) {
-            state.dismissedExpression = null;
-        }
-        state.lastExpression = expression;
-
         if (expression === state.dismissedExpression) {
             return;
         }
+        state.dismissedExpression = null;
 
         search(state, expression).then((results) => {
             if (results !== null) {
